@@ -57,8 +57,8 @@ def predict_temperatures(temp_initial, time_values, control_values, parameters: 
 def callback(params):
     print("Current params:", params)
 
-def cost_function(parameters, time_values, temperature_values, control_values):
-    parameters = ModelParameters(parameters)
+def cost_function(parameters, time_values, temperature_values, control_values, scaling_factors):
+    parameters = ModelParameters(parameters * scaling_factors)
     predicted_temperatures = predict_temperatures(temperature_values[0], time_values, control_values, parameters)
     error = 0
     for i in range(len(time_values)):
@@ -86,15 +86,21 @@ def main():
     initial_guess_rad = 1 / (sigma * sample_area)
 
     initial_guess = np.array([initial_guess_cond, initial_guess_rad, initial_guess_cond, initial_guess_rad, initial_guess_cond, initial_guess_rad])
+    scaling_factors = np.array([1e1, 1e10, 1e1, 1e10, 1e2, 1e10])
+    initial_guess = initial_guess / scaling_factors
     options = {
         "maxiter": 2000,
     }
-    result = opt.minimize(cost_function, initial_guess, args=(time_values, temperature_values, control_values), options=options, callback=callback)
+
+    bounds = [(1e-5, 1e2)] * len(initial_guess)  # Ensure all parameters are >= 1e-5
+
+    result = opt.minimize(cost_function, initial_guess, args=(time_values, temperature_values, control_values, scaling_factors), 
+                          options=options, callback=callback, method="Nelder-Mead", bounds=bounds)
     print(result)
 
     print(result.x)
 
-    final_parameters = ModelParameters(result.x)
+    final_parameters = ModelParameters(result.x * scaling_factors)
 
     predicted_temperatures = predict_temperatures(temperature_values[0], time_values, control_values, final_parameters)
 
